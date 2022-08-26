@@ -1,0 +1,313 @@
+{
+  "schema_version": 4,
+  "name": "Canary Alerts to runZero",
+  "description": "# Targeted Canary Alerts with GreyNoise Context\n\nThis story automates investigation of Canary alerts by checking the IP against GreyNoise and creating a Jira ticket if specific conditions are met. The workflow is as follows.\n\n1) An incoming webhook receives events from Canary whenever an alert fires\n2) The webhook activates a call to the Canary API to pull down the relevant incident details\n3) The public IP is extracted from the Canary incident and sent to GreyNoise to determine if it is noise. This triggers a regex check that only passes if this is not noise\n4) GreyNoise checks to see if the IP is malicious. This triggers a regex check that only passes if the IP is not malicious\n5) The pertinent Canary incident \ndetails are sent to Jira and autopopulated in the respective fields. ",
+  "guid": "184fe38efa72bb4e2f1b1f5eb8efd374",
+  "slug": "canary_alerts_to_runzero",
+  "exported_at": "2022-08-26T05:37:28Z",
+  "agents": [
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Quick Check IP in GreyNoise",
+      "disabled": false,
+      "guid": "4ae0ef3c7f0f191d4e7f498c0b8d5464",
+      "options": {
+        "url": "https://api.greynoise.io/v2/noise/quick/<<fetch_an_incident.body.incident.src_host>>",
+        "content_type": "json",
+        "method": "get",
+        "payload": {},
+        "headers": {
+          "key": "<<CREDENTIAL.greynoise_token>>"
+        },
+        "log_error_on_status": []
+      },
+      "reporting": {
+        "time_saved_value": 0,
+        "time_saved_unit": "minutes"
+      },
+      "monitoring": {
+        "monitor_all_events": false,
+        "monitor_failures": false,
+        "monitor_no_events_emitted": null
+      },
+      "schedule": null
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Trigger Action",
+      "disabled": false,
+      "guid": "0d5a4eb376499d21602fcaae2d1d66c8",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "false",
+            "path": "<<quick_check_ip_in_greynoise.body.noise>>"
+          }
+        ]
+      },
+      "reporting": {
+        "time_saved_value": 0,
+        "time_saved_unit": "minutes"
+      },
+      "monitoring": {
+        "monitor_all_events": false,
+        "monitor_failures": false,
+        "monitor_no_events_emitted": null
+      }
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Lookup IP in GreyNoise",
+      "disabled": false,
+      "guid": "fade91283873c35f8ea9c4988e90c603",
+      "options": {
+        "url": "https://api.greynoise.io/v2/noise/context/<<fetch_an_incident.body.incident.src_host>>",
+        "content_type": "json",
+        "method": "get",
+        "payload": {},
+        "headers": {
+          "key": "<<CREDENTIAL.greynoise_token>>"
+        }
+      },
+      "reporting": {
+        "time_saved_value": 0,
+        "time_saved_unit": "minutes"
+      },
+      "monitoring": {
+        "monitor_all_events": false,
+        "monitor_failures": false,
+        "monitor_no_events_emitted": null
+      },
+      "schedule": null
+    },
+    {
+      "type": "Agents::TriggerAgent",
+      "name": "Check If Seen",
+      "disabled": false,
+      "guid": "5ee01ae521124d7aaf414acce37717ea",
+      "options": {
+        "rules": [
+          {
+            "type": "regex",
+            "value": "false",
+            "path": "<<lookup_ip_in_greynoise.body.seen>>"
+          }
+        ]
+      },
+      "reporting": {
+        "time_saved_value": 0,
+        "time_saved_unit": "minutes"
+      },
+      "monitoring": {
+        "monitor_all_events": false,
+        "monitor_failures": false,
+        "monitor_no_events_emitted": null
+      }
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Fetch an Incident",
+      "disabled": false,
+      "guid": "2dd8f1cc17040e7f0186833f590bc1cb",
+      "options": {
+        "url": "https://<<RESOURCE.canary_hash>>.canary.tools/api/v1/incident/fetch",
+        "content_type": "json",
+        "method": "get",
+        "payload": {
+          "auth_token": "<<CREDENTIAL.canary_token>>",
+          "hash_id": "<<receive_alerts.body.IncidentHash>>"
+        },
+        "headers": {}
+      },
+      "reporting": {
+        "time_saved_value": 0,
+        "time_saved_unit": "minutes"
+      },
+      "monitoring": {
+        "monitor_all_events": false,
+        "monitor_failures": false,
+        "monitor_no_events_emitted": null
+      },
+      "schedule": null
+    },
+    {
+      "type": "Agents::EventTransformationAgent",
+      "name": "Build Results",
+      "disabled": false,
+      "guid": "dc4303f9f96842375a8121169ca34208",
+      "options": {
+        "mode": "explode",
+        "path": "=fetch_an_incident.body.incident.logdata",
+        "to": "summary"
+      },
+      "reporting": {
+        "time_saved_value": 0,
+        "time_saved_unit": "minutes"
+      },
+      "monitoring": {
+        "monitor_all_events": false,
+        "monitor_failures": false,
+        "monitor_no_events_emitted": null
+      },
+      "schedule": null
+    },
+    {
+      "type": "Agents::WebhookAgent",
+      "name": "Receive Alerts",
+      "disabled": false,
+      "guid": "feebfe45d660037d5eb0530c3bb4643f",
+      "options": {
+        "path": "68adca67f3a87bba426666c5fc482053",
+        "secret": "07f410e0424e557f57b16fd6ca61b0b8",
+        "verbs": "get,post"
+      },
+      "reporting": {
+        "time_saved_value": 0,
+        "time_saved_unit": "minutes"
+      },
+      "monitoring": {
+        "monitor_all_events": false,
+        "monitor_failures": false,
+        "monitor_no_events_emitted": null
+      }
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Scan asset in runZero",
+      "disabled": false,
+      "guid": "60d91862d7fb7349f7ea57249a405614",
+      "options": {
+        "url": "https://console.runzero.com/api/v1.0/org/sites/f5eb03aa-45dc-4954-acbe-6a898d969f25/scan",
+        "method": "put",
+        "content_type": "json",
+        "payload": {
+          "targets": "96.228.18.159",
+          "scan-name": "canary",
+          "scan-description": "canary",
+          "scan-frequency": "once",
+          "scan-start": "0",
+          "scan-tags": "",
+          "scan-grace-period": "4",
+          "agent": "054441e0-a76d-464e-902c-eda73b50f6e0",
+          "rate": "10000",
+          "max-host-rate": "100",
+          "passes": "3",
+          "max-attempts": "3",
+          "max-sockets": "500",
+          "max-group-size": "4096",
+          "max-ttl": "255",
+          "tcp-ports": "1-1000,5000-6000",
+          "tcp-excludes": "9500",
+          "screenshots": "true",
+          "nameservers": "8.8.8.8",
+          "subnet-ping": "true",
+          "subnet-ping-net-size": "256",
+          "subnet-ping-sample-rate": "3",
+          "host-ping": "false",
+          "probes": "arp,bacnet,connect,dns,echo,ike,ipmi,mdns,memcache,mssql,natpmp,netbios,pca,rdns,rpcbind,sip,snmp,ssdp,syn,ubnt,wlan-list,wsd"
+        },
+        "headers": {
+          "accept": "application/json",
+          "Authorization": "Bearer OT2E4090D896D384FE0DD230985C54"
+        }
+      },
+      "reporting": {
+        "time_saved_value": 0,
+        "time_saved_unit": "minutes"
+      },
+      "monitoring": {
+        "monitor_all_events": false,
+        "monitor_failures": false,
+        "monitor_no_events_emitted": null
+      },
+      "schedule": null
+    },
+    {
+      "type": "Agents::HTTPRequestAgent",
+      "name": "Scan asset in runZero",
+      "disabled": false,
+      "guid": "c577e59a42fa665bef318024dc576413",
+      "options": {
+        "url": "https://console.runzero.com/api/v1.0/org/sites/f5eb03aa-45dc-4954-acbe-6a898d969f25/scan",
+        "method": "put",
+        "content_type": "json",
+        "payload": {
+          "targets": "<<fetch_an_incident.body.incident.src_host>>",
+          "scan-name": "canary",
+          "scan-description": "canary",
+          "scan-frequency": "once",
+          "scan-start": "0",
+          "scan-tags": "",
+          "scan-grace-period": "4",
+          "agent": "054441e0-a76d-464e-902c-eda73b50f6e0",
+          "rate": "10000",
+          "max-host-rate": "100",
+          "passes": "3",
+          "max-attempts": "3",
+          "max-sockets": "500",
+          "max-group-size": "4096",
+          "max-ttl": "255",
+          "tcp-ports": "1-1000,5000-6000",
+          "tcp-excludes": "9500",
+          "screenshots": "true",
+          "nameservers": "8.8.8.8",
+          "subnet-ping": "true",
+          "subnet-ping-net-size": "256",
+          "subnet-ping-sample-rate": "3",
+          "host-ping": "false",
+          "probes": "arp,bacnet,connect,dns,echo,ike,ipmi,mdns,memcache,mssql,natpmp,netbios,pca,rdns,rpcbind,sip,snmp,ssdp,syn,ubnt,wlan-list,wsd"
+        },
+        "headers": {
+          "accept": "application/json",
+          "Authorization": "Bearer OT2E4090D896D384FE0DD230985C54"
+        }
+      },
+      "reporting": {
+        "time_saved_value": 0,
+        "time_saved_unit": "minutes"
+      },
+      "monitoring": {
+        "monitor_all_events": false,
+        "monitor_failures": false,
+        "monitor_no_events_emitted": null
+      },
+      "schedule": null
+    }
+  ],
+  "diagram_notes": [
+    {
+      "content": "# Canary Alerts to runZero\n\nThis story automates investigation of Canary alerts by adding the asset to runZero and scanning for context and then checking the IP against GreyNoise to determine if this is a known malicious address and therefore an indicator that your network may be compromised. The workflow consists of the following steps \n1) An incoming webhook receives events from Canary whenever an alert fires\n2) The webhook activates a call to the Canary API to pull down the relevant incident details\n3) The public IP is extracted from the Canary incident and sent to runZero to automatically build the asset inventory. The asset is automatically scanned for context.",
+      "position": [
+        -120.0,
+        -75.0
+      ],
+      "guid": "30ae6f88acc594e768bcdcd89190339a",
+      "width": null
+    }
+  ],
+  "links": [
+    {
+      "source": 4,
+      "receiver": 7
+    },
+    {
+      "source": 6,
+      "receiver": 4
+    }
+  ],
+  "diagram_layout": "{\"4ae0ef3c7f0f191d4e7f498c0b8d5464\":[-180,615],\"0d5a4eb376499d21602fcaae2d1d66c8\":[-210,390],\"fade91283873c35f8ea9c4988e90c603\":[120,600],\"5ee01ae521124d7aaf414acce37717ea\":[-180,495],\"2dd8f1cc17040e7f0186833f590bc1cb\":[165,15],\"dc4303f9f96842375a8121169ca34208\":[360,570],\"feebfe45d660037d5eb0530c3bb4643f\":[165,-75],\"60d91862d7fb7349f7ea57249a405614\":[165,105],\"c577e59a42fa665bef318024dc576413\":[75,480]}",
+  "send_to_story_enabled": false,
+  "entry_agent_guid": null,
+  "exit_agent_guids": [],
+  "exit_agent_guid": null,
+  "send_to_stories": [],
+  "form": {
+    "name": "WAF Alerts Form",
+    "description": "",
+    "fields": [],
+    "visibility": "tenant",
+    "agent_guid": null,
+    "success_message": "Thank you for your submission"
+  }
+}
