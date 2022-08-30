@@ -1,10 +1,15 @@
 #!/bin/bash
-# Canarytoken-GreyNoise-Enterprise-Threat-Intel-Report.sh
+# Canary-GreyNoise-Enterprise-Threat-Intel-Report.sh
 # Justin Varner
 # August 30, 2022
 
-# Fetch all incidents and filter out only IP addresses. Then write to a text file
-curl https://$CANARY_HASH.canary.tools/api/v1/incidents/all -d auth_token=$CANARY_TOKEN -G | jq '.' | grep -o '"src_host": "[^"]*' | grep -o '[^"]*$' | sort -u > canary-ips-$(date +%Y-%m-%d).txt
+## Fetch all bird events and filter out the IP then write to a text file
+curl -XGET "https://$CANARY_HASH.canary.tools/api/v1/incidents/outside_bird/download/json" \
+  -d auth_token=$CANARY_TOKEN \
+  -d node_id=$BIRD_ID \
+  -G -O -J \
+  && unzip outside_bird_alerts.json.zip \
+  && cat outside-bird-$BIRD_ID.json | jq '.[].ip_address' | sed 's/\"//g' | sort > canary-ips-$(date +%Y-%m-%d).txt
 
 ## Read all IPs from a text file and run through Shodan for threat intel
 file="canary-ips-$(date +%Y-%m-%d).txt"
